@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dividend-Funded Protective Put Analyzer</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222534;
+      --border: #2e3248;
+      --accent: #4f8ef7;
+      --accent2: #7c5cfc;
+      --green: #22c55e;
+      --yellow: #f59e0b;
+      --orange: #f97316;
+      --red: #ef4444;
+      --text: #e8eaf0;
+      --muted: #7a7f9a;
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 14px; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1a1d27 0%, #1c1f30 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-size: 20px; font-weight: 800; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .logo-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .mode-badge {
+      font-size: 11px; font-weight: 700; padding: 4px 12px;
+      border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase;
+    }
+    .mode-live { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+    .mode-demo { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+
+    /* ── Layout ── */
+    .main { max-width: 1280px; margin: 0 auto; padding: 28px 20px; }
+
+    /* ── Demo Notice ── */
+    .demo-notice {
+      display: none;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 8px;
+      padding: 12px 18px;
+      font-size: 12px;
+      color: #fcd34d;
+      margin-bottom: 18px;
+      line-height: 1.6;
+    }
+    .demo-notice strong { color: #fde68a; }
+
+    /* ── Search Card ── */
+    .search-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+    }
+    .search-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
+    .search-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    .field input {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 14px;
+      padding: 9px 13px; outline: none; transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    #ticker-input { width: 130px; font-weight: 700; letter-spacing: 1px; }
+    #shares-input { width: 120px; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 6px; color: #fff;
+      font-size: 14px; font-weight: 600; padding: 9px 26px;
+      cursor: pointer; transition: opacity 0.15s, transform 0.1s; height: 38px;
+    }
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .examples { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
+    .ex-label { font-size: 11px; color: var(--muted); }
+    .example-chip {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; color: var(--muted);
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      cursor: pointer; transition: all 0.12s; letter-spacing: 0.5px;
+    }
+    .example-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Error ── */
+    .error-box {
+      display: none;
+      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px; padding: 14px 18px;
+      color: #fca5a5; font-size: 13px; margin-bottom: 18px;
+    }
+
+    /* ── Loading ── */
+    .loading { display: none; text-align: center; padding: 48px; color: var(--muted); }
+    .spinner {
+      width: 34px; height: 34px;
+      border: 3px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.75s linear infinite; margin: 0 auto 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Stock Summary ── */
+    .stock-summary {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 22px 26px; margin-bottom: 18px; display: none;
+    }
+    .stock-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
+    .stock-ticker { font-size: 26px; font-weight: 900; color: var(--accent); }
+    .stock-name { font-size: 14px; color: var(--text); margin-top: 2px; font-weight: 500; }
+    .stock-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .tag {
+      display: inline-block; font-size: 10px; font-weight: 600;
+      border-radius: 4px; padding: 2px 8px; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .tag-blue { background: rgba(79,142,247,0.12); color: var(--accent); border: 1px solid rgba(79,142,247,0.2); }
+    .tag-gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; }
+    .kpi { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px; }
+    .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
+    .kpi-value { font-size: 18px; font-weight: 800; line-height: 1; }
+    .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+    .c-green { color: var(--green); }
+    .c-yellow { color: var(--yellow); }
+    .c-orange { color: var(--orange); }
+    .c-red { color: var(--red); }
+    .c-blue { color: var(--accent); }
+    .c-muted { color: var(--muted); }
+
+    /* ── Strategy Box ── */
+    .strategy-box {
+      background: rgba(79,142,247,0.06);
+      border: 1px solid rgba(79,142,247,0.2);
+      border-radius: 8px; padding: 14px 18px;
+      font-size: 12.5px; line-height: 1.75; color: var(--muted);
+      margin-bottom: 18px; display: none;
+    }
+    .strategy-box strong { color: var(--text); }
+
+    /* ── Table Section ── */
+    .table-section { display: none; }
+    .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .table-header h3 { font-size: 14px; font-weight: 700; }
+
+    .filter-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .filter-label { font-size: 11px; color: var(--muted); }
+    .filter-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600;
+      padding: 4px 11px; cursor: pointer; transition: all 0.12s;
+    }
+    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+
+    .table-wrapper { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    thead { position: sticky; top: 0; z-index: 10; }
+    th {
+      background: var(--surface2); color: var(--muted);
+      font-size: 10px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      padding: 10px 13px; text-align: right; white-space: nowrap;
+      border-bottom: 1px solid var(--border);
+    }
+    th.left { text-align: left; }
+    td { padding: 10px 13px; border-top: 1px solid rgba(46,50,72,0.6); text-align: right; white-space: nowrap; font-size: 12.5px; }
+    td.left { text-align: left; }
+    tr:hover td { background: rgba(255,255,255,0.022); }
+    .best-row td { background: rgba(79,142,247,0.05) !important; }
+    .best-row td:first-child { border-left: 2px solid var(--accent); }
+
+    /* ratio bar */
+    .ratio-cell { display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
+    .ratio-bar-bg { width: 52px; height: 5px; background: var(--border); border-radius: 3px; flex-shrink: 0; overflow: hidden; }
+    .ratio-bar-fill { height: 100%; border-radius: 3px; }
+    .badge {
+      display: inline-block; font-size: 9px; font-weight: 800;
+      padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px;
+    }
+    .bg-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .bg-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .bg-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
+    .bg-red { background: rgba(239,68,68,0.12); color: var(--red); }
+    .bg-gray { background: rgba(122,127,154,0.12); color: var(--muted); }
+
+    .tip { display: inline-block; width: 13px; height: 13px; background: var(--border); color: var(--muted); border-radius: 50%; text-align: center; line-height: 13px; font-size: 9px; cursor: help; margin-left: 3px; }
+
+    .table-footer { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+
+    @media (max-width: 640px) {
+      header { padding: 14px 16px; }
+      .main { padding: 14px 12px; }
+      .search-card { padding: 18px; }
+      .search-row { flex-direction: column; }
+      .field input, .btn-primary { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">Dividend-Funded Protective Put</div>
+    <div class="logo-sub">배당금으로 풋옵션 비용을 충당하는 전략 분석기</div>
+  </div>
+  <div class="mode-badge mode-demo" id="mode-badge" style="display:none"></div>
+</header>
+
+<div class="main">
+
+  <div class="demo-notice" id="demo-notice">
+    <strong>데모 모드 (Demo Mode)</strong> — 현재 라이브 시장 데이터 서버에 연결할 수 없습니다.
+    Black-Scholes 모델 기반의 추정 데이터를 표시합니다.
+    로컬 환경에서 앱을 실행하면 실제 시장 데이터(Yahoo Finance)를 사용합니다.
+    데모 지원 티커: <strong id="demo-tickers-list"></strong>
+  </div>
+
+  <!-- Search -->
+  <div class="search-card">
+    <h2>종목 분석</h2>
+    <div class="search-row">
+      <div class="field">
+        <label>티커 심볼 (NYSE / NASDAQ)</label>
+        <input type="text" id="ticker-input" placeholder="예: KO" autocomplete="off" spellcheck="false" />
+      </div>
+      <div class="field">
+        <label>보유 주식 수</label>
+        <input type="number" id="shares-input" value="100" min="1" max="100000" step="100" />
+      </div>
+      <div class="field" style="justify-content:flex-end">
+        <button class="btn-primary" id="analyze-btn" onclick="analyze()">분석하기 →</button>
+      </div>
+    </div>
+    <div class="examples">
+      <span class="ex-label">예시:</span>
+      <span class="example-chip" onclick="quickSearch('KO')">KO</span>
+      <span class="example-chip" onclick="quickSearch('JNJ')">JNJ</span>
+      <span class="example-chip" onclick="quickSearch('VZ')">VZ</span>
+      <span class="example-chip" onclick="quickSearch('MO')">MO</span>
+      <span class="example-chip" onclick="quickSearch('T')">T</span>
+      <span class="example-chip" onclick="quickSearch('XOM')">XOM</span>
+      <span class="example-chip" onclick="quickSearch('PFE')">PFE</span>
+      <span class="example-chip" onclick="quickSearch('AAPL')">AAPL</span>
+      <span class="example-chip" onclick="quickSearch('MSFT')">MSFT</span>
+    </div>
+  </div>
+
+  <div class="error-box" id="error-box"></div>
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div>데이터 로딩 중... (옵션 체인 수신에 수 초가 걸릴 수 있습니다)</div>
+  </div>
+
+  <!-- Stock Summary -->
+  <div class="stock-summary" id="stock-summary">
+    <div class="stock-header">
+      <div>
+        <div class="stock-ticker" id="s-ticker"></div>
+        <div class="stock-name" id="s-name"></div>
+        <div class="stock-meta" id="s-meta"></div>
+      </div>
+    </div>
+    <div class="kpi-grid" id="kpi-grid"></div>
+  </div>
+
+  <!-- Strategy Explanation -->
+  <div class="strategy-box" id="strategy-box">
+    <strong>전략 해설</strong> —
+    <em>Dividend-Funded Protective Put</em>은 주식을 보유하면서 풋옵션을 매수해 하방을 보호하고,
+    그 비용을 배당금으로 충당하는 전략입니다.
+    <strong>배당 커버리지(Spread Ratio)</strong>는 기간 배당금 ÷ 풋 프리미엄으로,
+    100%이면 배당금이 풋 비용을 완전히 충당합니다.
+    <strong>연환산 Spread Ratio</strong>는 만기 기간을 1년으로 표준화한 비율입니다.
+    비율이 높을수록 전략 비용 부담이 낮고, 100% 이상이면 배당이 풋 비용을 초과합니다.
+  </div>
+
+  <!-- Options Table -->
+  <div class="table-section" id="table-section">
+    <div class="table-header">
+      <h3 id="table-title">풋옵션별 배당 커버리지 분석</h3>
+      <div class="filter-bar">
+        <span class="filter-label">행사가 필터:</span>
+        <button class="filter-btn active" onclick="setFilter('all', this)">전체</button>
+        <button class="filter-btn" onclick="setFilter('ATM', this)">ATM (100%)</button>
+        <button class="filter-btn" onclick="setFilter('OTM 5%', this)">OTM 5%</button>
+        <button class="filter-btn" onclick="setFilter('OTM 10%', this)">OTM 10%</button>
+      </div>
+    </div>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th class="left">만기일</th>
+            <th class="left">행사가 유형</th>
+            <th>행사가</th>
+            <th>잔여일</th>
+            <th>프리미엄<br/>(주당)</th>
+            <th>연환산<br/>프리미엄</th>
+            <th>기간 배당<br/>(주당)</th>
+            <th>포지션<br/>배당 합계</th>
+            <th>풋 총비용<br/>(포지션)</th>
+            <th>순비용<br/>(배당차감)</th>
+            <th>
+              배당 커버리지
+              <span class="tip" title="(기간 배당 ÷ 풋 프리미엄) × 100. 100%이면 배당이 풋 비용을 완전 충당.">?</span>
+            </th>
+            <th>
+              연환산 Spread Ratio
+              <span class="tip" title="연간 배당 ÷ 연환산 풋 프리미엄. 만기 기간을 1년으로 표준화한 비교 지표.">?</span>
+            </th>
+            <th>거래량</th>
+          </tr>
+        </thead>
+        <tbody id="options-tbody"></tbody>
+      </table>
+    </div>
+    <div class="table-footer">
+      * 프리미엄: Bid-Ask 스프레드 &lt; 30%이면 중간값, 아니면 Ask 사용 &nbsp;|&nbsp;
+      연환산 = 프리미엄 × (365 ÷ 잔여일) &nbsp;|&nbsp;
+      <span style="color:var(--accent)">파란 테두리 행</span> = 연환산 Spread Ratio 최고 옵션
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let allOptions = [];
+  let currentFilter = 'all';
+
+  // Check health on page load
+  (async () => {
+    try {
+      const r = await fetch('/api/health');
+      const d = await r.json();
+      const badge = document.getElementById('mode-badge');
+      badge.style.display = 'block';
+      if (d.mode === 'live') {
+        badge.textContent = '🟢 Live Data';
+        badge.className = 'mode-badge mode-live';
+      } else {
+        badge.textContent = '🟡 Demo Mode';
+        badge.className = 'mode-badge mode-demo';
+        document.getElementById('demo-notice').style.display = 'block';
+        document.getElementById('demo-tickers-list').textContent = (d.demo_tickers || []).join(', ');
+      }
+    } catch(e) {}
+  })();
+
+  document.getElementById('ticker-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') analyze();
+  });
+
+  function quickSearch(ticker) {
+    document.getElementById('ticker-input').value = ticker;
+    analyze();
+  }
+
+  function setFilter(f, btn) {
+    currentFilter = f;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable(allOptions);
+  }
+
+  const fmt = (n, d = 2) => n == null ? '—' : Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const fmtPct = n => n == null ? '—' : fmt(n, 1) + '%';
+  const fmtMoney = n => {
+    if (n == null) return '—';
+    if (Math.abs(n) >= 1e12) return '$' + fmt(n / 1e12, 2) + 'T';
+    if (Math.abs(n) >= 1e9)  return '$' + fmt(n / 1e9, 2) + 'B';
+    if (Math.abs(n) >= 1e6)  return '$' + fmt(n / 1e6, 2) + 'M';
+    return '$' + fmt(n, 2);
+  };
+
+  function getRatioMeta(ratio) {
+    if (ratio == null) return { badge: '<span class="badge bg-gray">N/A</span>', color: '#374151' };
+    if (ratio >= 1.0) return { badge: '<span class="badge bg-green">≥ 100%</span>', color: '#22c55e' };
+    if (ratio >= 0.7) return { badge: '<span class="badge bg-yellow">70~99%</span>', color: '#f59e0b' };
+    if (ratio >= 0.4) return { badge: '<span class="badge bg-orange">40~69%</span>', color: '#f97316' };
+    return { badge: '<span class="badge bg-red">&lt; 40%</span>', color: '#ef4444' };
+  }
+
+  function renderTable(options) {
+    const list = currentFilter === 'all'
+      ? options
+      : options.filter(o => o.strike_label.startsWith(currentFilter === 'OTM 5%' ? 'OTM 5%' : currentFilter === 'OTM 10%' ? 'OTM 10%' : 'ATM'));
+
+    const tbody = document.getElementById('options-tbody');
+    if (!list.length) {
+      tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:32px;color:var(--muted)">해당 조건의 옵션이 없습니다</td></tr>';
+      return;
+    }
+
+    const bestAnn = Math.max(...list.map(o => o.annualized_spread_ratio ?? 0));
+
+    tbody.innerHTML = list.map(opt => {
+      const ratio = opt.spread_ratio;
+      const ann = opt.annualized_spread_ratio;
+      const { badge, color } = getRatioMeta(ratio);
+      const annMeta = getRatioMeta(ann);
+      const barW = Math.min(100, (ratio ?? 0) * 100);
+      const isBest = ann != null && Math.abs(ann - bestAnn) < 0.0001 && bestAnn > 0;
+
+      const netCell = opt.net_put_cost_per_share <= 0
+        ? `<span class="c-green" style="font-weight:700">완전 충당</span>`
+        : `$${fmt(opt.net_put_cost_per_share, 4)}<br/><span class="c-muted" style="font-size:10px">(-${fmtPct(opt.net_put_cost_pct)})</span>`;
+
+      const ratioCell = `
+        <div class="ratio-cell">
+          ${badge}
+          <div class="ratio-bar-bg"><div class="ratio-bar-fill" style="width:${barW}%;background:${color}"></div></div>
+          <span style="color:${color};font-weight:700">${ratio != null ? fmtPct(ratio*100) : '—'}</span>
+        </div>`;
+
+      return `<tr class="${isBest ? 'best-row' : ''}">
+        <td class="left"><strong>${opt.expiration}</strong></td>
+        <td class="left"><span style="color:var(--accent);font-weight:700">${opt.strike_label}</span></td>
+        <td>$${fmt(opt.strike, 2)} <span class="c-muted" style="font-size:10px">(${fmtPct(opt.strike_pct)})</span></td>
+        <td>${opt.days_to_exp}일</td>
+        <td>
+          $${fmt(opt.premium_per_share, 4)}<br/>
+          <span class="c-muted" style="font-size:10px">${fmt(opt.bid,3)} / ${fmt(opt.ask,3)}</span>
+        </td>
+        <td>$${fmt(opt.annualized_premium_per_share, 4)}</td>
+        <td class="c-green">$${fmt(opt.period_div_per_share, 4)}</td>
+        <td class="c-green">$${fmt(opt.period_div_total, 2)}</td>
+        <td class="c-red">$${fmt(opt.put_cost_total, 2)}</td>
+        <td>${netCell}</td>
+        <td>${ratioCell}</td>
+        <td style="color:${annMeta.color};font-weight:800;font-size:13px">${ann != null ? fmtPct(ann*100) : '—'}</td>
+        <td class="c-muted">${opt.volume.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  async function analyze() {
+    const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+    const shares = parseInt(document.getElementById('shares-input').value) || 100;
+
+    if (!ticker) { alert('티커를 입력하세요'); return; }
+
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('stock-summary').style.display = 'none';
+    document.getElementById('table-section').style.display = 'none';
+    document.getElementById('strategy-box').style.display = 'none';
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('analyze-btn').disabled = true;
+
+    try {
+      const res = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}&shares=${shares}`);
+      const data = await res.json();
+
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('analyze-btn').disabled = false;
+
+      if (!res.ok || data.error) {
+        const eb = document.getElementById('error-box');
+        eb.style.display = 'block';
+        eb.textContent = data.error || '알 수 없는 오류가 발생했습니다.';
+        if (data.stock) renderSummary(data.stock, shares, null, data.demo_mode);
+        return;
+      }
+
+      renderSummary(data.stock, shares, data, data.demo_mode);
+
+      allOptions = data.options;
+      currentFilter = 'all';
+      document.querySelectorAll('.filter-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+
+      document.getElementById('table-title').textContent =
+        `${ticker} 풋옵션별 배당 커버리지 분석 (${shares.toLocaleString()}주 기준)`;
+      document.getElementById('table-section').style.display = 'block';
+      document.getElementById('strategy-box').style.display = 'block';
+      renderTable(allOptions);
+
+    } catch(e) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('analyze-btn').disabled = false;
+      const eb = document.getElementById('error-box');
+      eb.style.display = 'block';
+      eb.textContent = '서버 연결 오류: ' + e.message;
+    }
+  }
+
+  function renderSummary(stock, shares, data, isDemo) {
+    document.getElementById('s-ticker').textContent = stock.ticker;
+    document.getElementById('s-name').textContent = stock.name;
+
+    const metaEl = document.getElementById('s-meta');
+    metaEl.innerHTML = `
+      <span class="tag tag-blue">${stock.exchange}</span>
+      ${stock.sector && stock.sector !== 'N/A' ? `<span class="tag tag-gray">${stock.sector}</span>` : ''}
+      ${isDemo ? '<span class="tag" style="background:rgba(245,158,11,0.12);color:var(--yellow);border:1px solid rgba(245,158,11,0.25)">Demo Data</span>' : ''}
+    `;
+
+    const posVal = stock.price * shares;
+    const annDiv = stock.annual_div_per_share * shares;
+
+    let bestHtml = '—';
+    let bestSub = '&nbsp;';
+    if (data && data.best_option) {
+      const b = data.best_option;
+      const v = b.annualized_spread_ratio;
+      const c = v >= 1 ? 'c-green' : v >= 0.5 ? 'c-yellow' : 'c-red';
+      bestHtml = `<span class="${c}">${fmt(v * 100, 1)}%</span>`;
+      bestSub = `만기 ${b.expiration} · ${b.strike_label}`;
+    }
+
+    document.getElementById('kpi-grid').innerHTML = `
+      <div class="kpi">
+        <div class="kpi-label">현재 주가</div>
+        <div class="kpi-value c-blue">$${fmt(stock.price, 2)}</div>
+        <div class="kpi-sub">${stock.exchange}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">연간 주당 배당금</div>
+        <div class="kpi-value c-green">$${fmt(stock.annual_div_per_share, 4)}</div>
+        <div class="kpi-sub">배당수익률 ${fmtPct(stock.div_yield_pct)}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">포지션 가치</div>
+        <div class="kpi-value c-blue">$${fmt(posVal, 0)}</div>
+        <div class="kpi-sub">${shares.toLocaleString()}주 × $${fmt(stock.price, 2)}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">연간 배당 합계</div>
+        <div class="kpi-value c-green">$${fmt(annDiv, 2)}</div>
+        <div class="kpi-sub">${shares.toLocaleString()}주 포지션 기준</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">최고 연환산 Spread Ratio</div>
+        <div class="kpi-value">${bestHtml}</div>
+        <div class="kpi-sub">${bestSub}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">시가총액</div>
+        <div class="kpi-value" style="font-size:15px">${stock.market_cap ? fmtMoney(stock.market_cap) : '—'}</div>
+        <div class="kpi-sub">&nbsp;</div>
+      </div>
+    `;
+    document.getElementById('stock-summary').style.display = 'block';
+  }
+</script>
+</body>
+</html>
