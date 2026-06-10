@@ -1,556 +1,605 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Dividend-Funded Protective Put Analyzer</title>
-  <style>
-    :root {
-      --bg: #0f1117;
-      --surface: #1a1d27;
-      --surface2: #222534;
-      --border: #2e3248;
-      --accent: #4f8ef7;
-      --accent2: #7c5cfc;
-      --green: #22c55e;
-      --yellow: #f59e0b;
-      --orange: #f97316;
-      --red: #ef4444;
-      --text: #e8eaf0;
-      --muted: #7a7f9a;
-      --radius: 10px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 14px; min-height: 100vh; }
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>크레아틴 흡수 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Claude / Anthropic palette */
+    --bg:        #F0EEE6;   /* warm ivory canvas */
+    --surface:   #FAF9F5;   /* card */
+    --surface-2: #F4F2EC;   /* subtle inset */
+    --border:    #E3E0D6;   /* hairline border */
+    --border-2:  #D8D4C8;
+    --clay:      #C96442;   /* Claude clay accent */
+    --clay-soft: #D9876A;
+    --clay-tint: rgba(201,100,66,0.10);
+    --ink:       #1F1E1D;   /* primary text */
+    --ink-2:     #3D3C39;
+    --muted:     #6F6B60;   /* secondary text */
+    --muted-2:   #908B7E;
+    --good:      #6A8D5B;
+    --grid:      #E7E4DA;
+    --shadow:    0 1px 2px rgba(40,36,28,0.04), 0 4px 16px rgba(40,36,28,0.05);
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+    --serif: 'Source Serif 4', ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+  }
 
-    /* ── Header ── */
-    header {
-      background: linear-gradient(135deg, #1a1d27 0%, #1c1f30 100%);
-      border-bottom: 1px solid var(--border);
-      padding: 18px 32px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .logo { font-size: 20px; font-weight: 800; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .logo-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
-    .mode-badge {
-      font-size: 11px; font-weight: 700; padding: 4px 12px;
-      border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase;
-    }
-    .mode-live { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
-    .mode-demo { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
 
-    /* ── Layout ── */
-    .main { max-width: 1280px; margin: 0 auto; padding: 28px 20px; }
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
 
-    /* ── Demo Notice ── */
-    .demo-notice {
-      display: none;
-      background: rgba(245,158,11,0.08);
-      border: 1px solid rgba(245,158,11,0.3);
-      border-radius: 8px;
-      padding: 12px 18px;
-      font-size: 12px;
-      color: #fcd34d;
-      margin-bottom: 18px;
-      line-height: 1.6;
-    }
-    .demo-notice strong { color: #fde68a; }
+  /* ---- Header ---- */
+  header { margin-bottom: 32px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 500; letter-spacing: .02em;
+    color: var(--clay);
+    background: var(--clay-tint);
+    border: 1px solid rgba(201,100,66,0.18);
+    padding: 5px 12px; border-radius: 999px;
+    margin-bottom: 18px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 500;
+    font-size: 34px;
+    line-height: 1.18;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+    color: var(--ink);
+  }
+  .subtitle {
+    font-family: var(--serif);
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 60ch;
+    margin: 0;
+  }
 
-    /* ── Search Card ── */
-    .search-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 24px 28px;
-      margin-bottom: 20px;
-    }
-    .search-card h2 { font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text); }
-    .search-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
-    .field { display: flex; flex-direction: column; gap: 5px; }
-    .field label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-    .field input {
-      background: var(--bg); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); font-size: 14px;
-      padding: 9px 13px; outline: none; transition: border-color 0.15s;
-    }
-    .field input:focus { border-color: var(--accent); }
-    #ticker-input { width: 130px; font-weight: 700; letter-spacing: 1px; }
-    #shares-input { width: 120px; }
-    .btn-primary {
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border: none; border-radius: 6px; color: #fff;
-      font-size: 14px; font-weight: 600; padding: 9px 26px;
-      cursor: pointer; transition: opacity 0.15s, transform 0.1s; height: 38px;
-    }
-    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
-    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-    .examples { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; align-items: center; }
-    .ex-label { font-size: 11px; color: var(--muted); }
-    .example-chip {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 20px; color: var(--muted);
-      font-size: 11px; font-weight: 700; padding: 3px 10px;
-      cursor: pointer; transition: all 0.12s; letter-spacing: 0.5px;
-    }
-    .example-chip:hover { border-color: var(--accent); color: var(--accent); }
+  /* ---- Layout ---- */
+  .grid {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+    margin-top: 32px;
+  }
+  @media (max-width: 880px) {
+    .grid { grid-template-columns: 1fr; }
+  }
 
-    /* ── Error ── */
-    .error-box {
-      display: none;
-      background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.3);
-      border-radius: 8px; padding: 14px 18px;
-      color: #fca5a5; font-size: 13px; margin-bottom: 18px;
-    }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 24px;
+  }
+  .card + .card { margin-top: 20px; }
 
-    /* ── Loading ── */
-    .loading { display: none; text-align: center; padding: 48px; color: var(--muted); }
-    .spinner {
-      width: 34px; height: 34px;
-      border: 3px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin 0.75s linear infinite; margin: 0 auto 14px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+  .card-title {
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: var(--ink);
+  }
+  .card-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin: 0 0 20px;
+  }
 
-    /* ── Stock Summary ── */
-    .stock-summary {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 22px 26px; margin-bottom: 18px; display: none;
-    }
-    .stock-header { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
-    .stock-ticker { font-size: 26px; font-weight: 900; color: var(--accent); }
-    .stock-name { font-size: 14px; color: var(--text); margin-top: 2px; font-weight: 500; }
-    .stock-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-    .tag {
-      display: inline-block; font-size: 10px; font-weight: 600;
-      border-radius: 4px; padding: 2px 8px; text-transform: uppercase; letter-spacing: 0.3px;
-    }
-    .tag-blue { background: rgba(79,142,247,0.12); color: var(--accent); border: 1px solid rgba(79,142,247,0.2); }
-    .tag-gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  /* ---- Number inputs ---- */
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: 13px; font-weight: 500;
+    color: var(--ink-2);
+    margin-bottom: 7px;
+  }
+  .num-row { display: flex; align-items: center; gap: 10px; }
+  input[type="number"] {
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 15px;
+    color: var(--ink);
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type="number"]:focus {
+    outline: none;
+    border-color: var(--clay-soft);
+    box-shadow: 0 0 0 3px var(--clay-tint);
+  }
+  .unit { font-size: 13px; color: var(--muted); white-space: nowrap; }
 
-    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 12px; }
-    .kpi { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px; }
-    .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; font-weight: 600; }
-    .kpi-value { font-size: 18px; font-weight: 800; line-height: 1; }
-    .kpi-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
-    .c-green { color: var(--green); }
-    .c-yellow { color: var(--yellow); }
-    .c-orange { color: var(--orange); }
-    .c-red { color: var(--red); }
-    .c-blue { color: var(--accent); }
-    .c-muted { color: var(--muted); }
+  /* ---- Sliders ---- */
+  .slider {
+    margin-bottom: 22px;
+  }
+  .slider:last-child { margin-bottom: 0; }
+  .slider-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .slider-label {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13.5px; font-weight: 500; color: var(--ink-2);
+  }
+  .swatch { width: 9px; height: 9px; border-radius: 3px; }
+  .slider-value {
+    font-family: var(--serif);
+    font-size: 16px; font-weight: 600;
+    color: var(--clay);
+    font-variant-numeric: tabular-nums;
+  }
 
-    /* ── Strategy Box ── */
-    .strategy-box {
-      background: rgba(79,142,247,0.06);
-      border: 1px solid rgba(79,142,247,0.2);
-      border-radius: 8px; padding: 14px 18px;
-      font-size: 12.5px; line-height: 1.75; color: var(--muted);
-      margin-bottom: 18px; display: none;
-    }
-    .strategy-box strong { color: var(--text); }
+  input[type="range"] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; height: 6px; margin: 0;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 999px;
+    background: var(--track, var(--surface-2));
+    border: 1px solid var(--border-2);
+  }
+  input[type="range"]::-moz-range-track {
+    height: 6px; border-radius: 999px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 20px; height: 20px; margin-top: -8px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 2px solid var(--thumb, var(--clay));
+    box-shadow: 0 1px 4px rgba(40,36,28,0.18);
+    transition: transform .12s cubic-bezier(.2,.8,.3,1), box-shadow .12s ease;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px; border: 2px solid var(--thumb, var(--clay));
+    border-radius: 50%; background: var(--surface);
+    box-shadow: 0 1px 4px rgba(40,36,28,0.18);
+  }
+  input[type="range"]:hover::-webkit-slider-thumb { transform: scale(1.12); }
+  input[type="range"]:active::-webkit-slider-thumb {
+    transform: scale(1.18);
+    box-shadow: 0 0 0 6px var(--clay-tint), 0 1px 4px rgba(40,36,28,0.18);
+  }
+  input[type="range"]:focus { outline: none; }
+  input[type="range"]:focus-visible::-webkit-slider-thumb {
+    box-shadow: 0 0 0 5px var(--clay-tint), 0 1px 4px rgba(40,36,28,0.18);
+  }
 
-    /* ── Table Section ── */
-    .table-section { display: none; }
-    .table-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-    .table-header h3 { font-size: 14px; font-weight: 700; }
+  /* ---- Stats strip ---- */
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; margin-bottom: 20px;
+  }
+  .stat {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .stat .k { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .stat .v {
+    font-family: var(--serif);
+    font-size: 23px; font-weight: 600; color: var(--ink);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .stat .v small { font-size: 13px; color: var(--muted); font-weight: 500; }
 
-    .filter-bar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-    .filter-label { font-size: 11px; color: var(--muted); }
-    .filter-btn {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600;
-      padding: 4px 11px; cursor: pointer; transition: all 0.12s;
-    }
-    .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .filter-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+  /* ---- Charts ---- */
+  .chart-block { margin-bottom: 26px; }
+  .chart-block:last-child { margin-bottom: 0; }
+  .chart-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .chart-title { font-family: var(--serif); font-size: 16px; font-weight: 600; color: var(--ink); margin: 0; }
+  .chart-meta { font-size: 12px; color: var(--muted); }
+  svg { display: block; width: 100%; height: auto; }
 
-    .table-wrapper { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; }
-    thead { position: sticky; top: 0; z-index: 10; }
-    th {
-      background: var(--surface2); color: var(--muted);
-      font-size: 10px; font-weight: 700;
-      text-transform: uppercase; letter-spacing: 0.5px;
-      padding: 10px 13px; text-align: right; white-space: nowrap;
-      border-bottom: 1px solid var(--border);
-    }
-    th.left { text-align: left; }
-    td { padding: 10px 13px; border-top: 1px solid rgba(46,50,72,0.6); text-align: right; white-space: nowrap; font-size: 12.5px; }
-    td.left { text-align: left; }
-    tr:hover td { background: rgba(255,255,255,0.022); }
-    .best-row td { background: rgba(79,142,247,0.05) !important; }
-    .best-row td:first-child { border-left: 2px solid var(--accent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+  .legend-line { width: 18px; height: 0; border-top: 2.5px solid var(--clay); }
+  .legend-band { width: 18px; height: 11px; border-radius: 3px; background: var(--clay-tint); border: 1px solid rgba(201,100,66,0.22); }
+  .legend-mark { width: 0; height: 14px; border-left: 1.5px dashed var(--muted-2); }
 
-    /* ratio bar */
-    .ratio-cell { display: flex; align-items: center; gap: 7px; justify-content: flex-end; }
-    .ratio-bar-bg { width: 52px; height: 5px; background: var(--border); border-radius: 3px; flex-shrink: 0; overflow: hidden; }
-    .ratio-bar-fill { height: 100%; border-radius: 3px; }
-    .badge {
-      display: inline-block; font-size: 9px; font-weight: 800;
-      padding: 2px 6px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.3px;
-    }
-    .bg-green { background: rgba(34,197,94,0.15); color: var(--green); }
-    .bg-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
-    .bg-orange { background: rgba(249,115,22,0.15); color: var(--orange); }
-    .bg-red { background: rgba(239,68,68,0.12); color: var(--red); }
-    .bg-gray { background: rgba(122,127,154,0.12); color: var(--muted); }
-
-    .tip { display: inline-block; width: 13px; height: 13px; background: var(--border); color: var(--muted); border-radius: 50%; text-align: center; line-height: 13px; font-size: 9px; cursor: help; margin-left: 3px; }
-
-    .table-footer { margin-top: 10px; font-size: 11px; color: var(--muted); line-height: 1.6; }
-
-    @media (max-width: 640px) {
-      header { padding: 14px 16px; }
-      .main { padding: 14px 12px; }
-      .search-card { padding: 18px; }
-      .search-row { flex-direction: column; }
-      .field input, .btn-primary { width: 100%; }
-    }
-  </style>
+  .note {
+    margin-top: 24px;
+    font-size: 12.5px;
+    color: var(--muted-2);
+    line-height: 1.6;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+  .note strong { color: var(--muted); font-weight: 600; }
+  footer { margin-top: 40px; text-align: center; font-size: 12px; color: var(--muted-2); }
+</style>
 </head>
 <body>
-<header>
-  <div>
-    <div class="logo">Dividend-Funded Protective Put</div>
-    <div class="logo-sub">배당금으로 풋옵션 비용을 충당하는 전략 분석기</div>
-  </div>
-  <div class="mode-badge mode-demo" id="mode-badge" style="display:none"></div>
-</header>
+<div class="wrap">
+  <header>
+    <span class="eyebrow"><span class="dot"></span>크레아틴 흡수 시뮬레이터</span>
+    <h1>타이밍에 따른 크레아틴 흡수·체내 로드 시뮬레이션</h1>
+    <p class="subtitle">몸무게와 키, 그리고 운동·식사·섭취 타이밍을 조절하면 하루 동안의 크레아틴 흡수량과 근육 내 로드율이 오차범위와 함께 실시간으로 그려집니다.</p>
+  </header>
 
-<div class="main">
-
-  <div class="demo-notice" id="demo-notice">
-    <strong>데모 모드 (Demo Mode)</strong> — 현재 라이브 시장 데이터 서버에 연결할 수 없습니다.
-    Black-Scholes 모델 기반의 추정 데이터를 표시합니다.
-    로컬 환경에서 앱을 실행하면 실제 시장 데이터(Yahoo Finance)를 사용합니다.
-    데모 지원 티커: <strong id="demo-tickers-list"></strong>
-  </div>
-
-  <!-- Search -->
-  <div class="search-card">
-    <h2>종목 분석</h2>
-    <div class="search-row">
-      <div class="field">
-        <label>티커 심볼 (NYSE / NASDAQ)</label>
-        <input type="text" id="ticker-input" placeholder="예: KO" autocomplete="off" spellcheck="false" />
+  <div class="grid">
+    <!-- ============ CONTROLS ============ -->
+    <div>
+      <div class="card">
+        <h2 class="card-title">신체 정보</h2>
+        <p class="card-sub">근육량과 저장 용량을 추정하는 데 사용됩니다.</p>
+        <div class="field">
+          <label for="weight">몸무게</label>
+          <div class="num-row">
+            <input type="number" id="weight" value="70" min="35" max="160" step="0.5" />
+            <span class="unit">kg</span>
+          </div>
+        </div>
+        <div class="field">
+          <label for="height">키</label>
+          <div class="num-row">
+            <input type="number" id="height" value="173" min="130" max="210" step="0.5" />
+            <span class="unit">cm</span>
+          </div>
+        </div>
       </div>
-      <div class="field">
-        <label>보유 주식 수</label>
-        <input type="number" id="shares-input" value="100" min="1" max="100000" step="100" />
-      </div>
-      <div class="field" style="justify-content:flex-end">
-        <button class="btn-primary" id="analyze-btn" onclick="analyze()">분석하기 →</button>
-      </div>
-    </div>
-    <div class="examples">
-      <span class="ex-label">예시:</span>
-      <span class="example-chip" onclick="quickSearch('KO')">KO</span>
-      <span class="example-chip" onclick="quickSearch('JNJ')">JNJ</span>
-      <span class="example-chip" onclick="quickSearch('VZ')">VZ</span>
-      <span class="example-chip" onclick="quickSearch('MO')">MO</span>
-      <span class="example-chip" onclick="quickSearch('T')">T</span>
-      <span class="example-chip" onclick="quickSearch('XOM')">XOM</span>
-      <span class="example-chip" onclick="quickSearch('PFE')">PFE</span>
-      <span class="example-chip" onclick="quickSearch('AAPL')">AAPL</span>
-      <span class="example-chip" onclick="quickSearch('MSFT')">MSFT</span>
-    </div>
-  </div>
 
-  <div class="error-box" id="error-box"></div>
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <div>데이터 로딩 중... (옵션 체인 수신에 수 초가 걸릴 수 있습니다)</div>
-  </div>
+      <div class="card">
+        <h2 class="card-title">변수 조절</h2>
+        <p class="card-sub">bar를 부드럽게 움직여 타이밍과 섭취량을 바꿔 보세요.</p>
 
-  <!-- Stock Summary -->
-  <div class="stock-summary" id="stock-summary">
-    <div class="stock-header">
-      <div>
-        <div class="stock-ticker" id="s-ticker"></div>
-        <div class="stock-name" id="s-name"></div>
-        <div class="stock-meta" id="s-meta"></div>
-      </div>
-    </div>
-    <div class="kpi-grid" id="kpi-grid"></div>
-  </div>
+        <div class="slider">
+          <div class="slider-head">
+            <span class="slider-label"><span class="swatch" style="background:#C96442"></span>크레아틴 섭취 시간</span>
+            <span class="slider-value" id="v-intake">08:00</span>
+          </div>
+          <input type="range" id="intake" min="0" max="24" step="0.25" value="8"
+                 style="--thumb:#C96442" />
+        </div>
 
-  <!-- Strategy Explanation -->
-  <div class="strategy-box" id="strategy-box">
-    <strong>전략 해설</strong> —
-    <em>Dividend-Funded Protective Put</em>은 주식을 보유하면서 풋옵션을 매수해 하방을 보호하고,
-    그 비용을 배당금으로 충당하는 전략입니다.
-    <strong>배당 커버리지(Spread Ratio)</strong>는 기간 배당금 ÷ 풋 프리미엄으로,
-    100%이면 배당금이 풋 비용을 완전히 충당합니다.
-    <strong>연환산 Spread Ratio</strong>는 만기 기간을 1년으로 표준화한 비율입니다.
-    비율이 높을수록 전략 비용 부담이 낮고, 100% 이상이면 배당이 풋 비용을 초과합니다.
-  </div>
+        <div class="slider">
+          <div class="slider-head">
+            <span class="slider-label"><span class="swatch" style="background:#C96442"></span>섭취량</span>
+            <span class="slider-value" id="v-dose">5.0 g</span>
+          </div>
+          <input type="range" id="dose" min="0.5" max="20" step="0.1" value="5"
+                 style="--thumb:#C96442" />
+        </div>
 
-  <!-- Options Table -->
-  <div class="table-section" id="table-section">
-    <div class="table-header">
-      <h3 id="table-title">풋옵션별 배당 커버리지 분석</h3>
-      <div class="filter-bar">
-        <span class="filter-label">행사가 필터:</span>
-        <button class="filter-btn active" onclick="setFilter('all', this)">전체</button>
-        <button class="filter-btn" onclick="setFilter('ATM', this)">ATM (100%)</button>
-        <button class="filter-btn" onclick="setFilter('OTM 5%', this)">OTM 5%</button>
-        <button class="filter-btn" onclick="setFilter('OTM 10%', this)">OTM 10%</button>
+        <div class="slider">
+          <div class="slider-head">
+            <span class="slider-label"><span class="swatch" style="background:#6A8D5B"></span>식사 시간</span>
+            <span class="slider-value" id="v-meal">07:30</span>
+          </div>
+          <input type="range" id="meal" min="0" max="24" step="0.25" value="7.5"
+                 style="--thumb:#6A8D5B" />
+        </div>
+
+        <div class="slider">
+          <div class="slider-head">
+            <span class="slider-label"><span class="swatch" style="background:#8466C9"></span>운동 시간</span>
+            <span class="slider-value" id="v-exercise">18:00</span>
+          </div>
+          <input type="range" id="exercise" min="0" max="24" step="0.25" value="18"
+                 style="--thumb:#8466C9" />
+        </div>
       </div>
     </div>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th class="left">만기일</th>
-            <th class="left">행사가 유형</th>
-            <th>행사가</th>
-            <th>잔여일</th>
-            <th>프리미엄<br/>(주당)</th>
-            <th>연환산<br/>프리미엄</th>
-            <th>기간 배당<br/>(주당)</th>
-            <th>포지션<br/>배당 합계</th>
-            <th>풋 총비용<br/>(포지션)</th>
-            <th>순비용<br/>(배당차감)</th>
-            <th>
-              배당 커버리지
-              <span class="tip" title="(기간 배당 ÷ 풋 프리미엄) × 100. 100%이면 배당이 풋 비용을 완전 충당.">?</span>
-            </th>
-            <th>
-              연환산 Spread Ratio
-              <span class="tip" title="연간 배당 ÷ 연환산 풋 프리미엄. 만기 기간을 1년으로 표준화한 비교 지표.">?</span>
-            </th>
-            <th>거래량</th>
-          </tr>
-        </thead>
-        <tbody id="options-tbody"></tbody>
-      </table>
-    </div>
-    <div class="table-footer">
-      * 프리미엄: Bid-Ask 스프레드 &lt; 30%이면 중간값, 아니면 Ask 사용 &nbsp;|&nbsp;
-      연환산 = 프리미엄 × (365 ÷ 잔여일) &nbsp;|&nbsp;
-      <span style="color:var(--accent)">파란 테두리 행</span> = 연환산 Spread Ratio 최고 옵션
+
+    <!-- ============ RESULTS ============ -->
+    <div>
+      <div class="card">
+        <div class="stats">
+          <div class="stat">
+            <div class="k">추정 근육량</div>
+            <div class="v" id="s-muscle">—<small> kg</small></div>
+          </div>
+          <div class="stat">
+            <div class="k">저장 용량</div>
+            <div class="v" id="s-capacity">—<small> g</small></div>
+          </div>
+          <div class="stat">
+            <div class="k">하루 순 흡수</div>
+            <div class="v" id="s-uptake">—<small> g</small></div>
+          </div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-head">
+            <h3 class="chart-title">시간대별 크레아틴 흡수량</h3>
+            <span class="chart-meta">g / 시간 · 오차범위 ±15%</span>
+          </div>
+          <svg id="chart-abs" viewBox="0 0 640 260" role="img" aria-label="시간대별 흡수량 그래프"></svg>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-line"></span>혈중 흡수율</span>
+            <span class="legend-item"><span class="legend-band"></span>오차범위</span>
+            <span class="legend-item"><span class="legend-mark"></span>이벤트 시각</span>
+          </div>
+        </div>
+
+        <div class="chart-block">
+          <div class="chart-head">
+            <h3 class="chart-title">체내 크레아틴 로드율</h3>
+            <span class="chart-meta">근육 저장 용량 대비 % · 누적 오차범위</span>
+          </div>
+          <svg id="chart-load" viewBox="0 0 640 260" role="img" aria-label="체내 로드율 그래프"></svg>
+          <div class="legend">
+            <span class="legend-item"><span class="legend-line"></span>로드율</span>
+            <span class="legend-item"><span class="legend-band"></span>오차범위</span>
+            <span class="legend-item"><span class="legend-mark"></span>이벤트 시각</span>
+          </div>
+        </div>
+
+        <p class="note">
+          <strong>모델 안내.</strong> 1구획 흡수(ka)·신장 배설(ke)·인슐린(식사)과 운동에 의한
+          근육 흡수 증강을 단순화한 약동학 근사 모델입니다. 섭취 시각을 식사·운동 시각에 가깝게 두면
+          근육 흡수 효율이 올라갑니다. 교육·시각화 목적의 추정치이며 의학적 조언이 아닙니다.
+        </p>
+      </div>
     </div>
   </div>
 
+  <footer>크레아틴 흡수 시뮬레이터 · 클라이언트 측에서만 계산됩니다</footer>
 </div>
 
 <script>
-  let allOptions = [];
-  let currentFilter = 'all';
+"use strict";
 
-  // Check health on page load
-  (async () => {
-    try {
-      const r = await fetch('/api/health');
-      const d = await r.json();
-      const badge = document.getElementById('mode-badge');
-      badge.style.display = 'block';
-      if (d.mode === 'live') {
-        badge.textContent = '🟢 Live Data';
-        badge.className = 'mode-badge mode-live';
-      } else {
-        badge.textContent = '🟡 Demo Mode';
-        badge.className = 'mode-badge mode-demo';
-        document.getElementById('demo-notice').style.display = 'block';
-        document.getElementById('demo-tickers-list').textContent = (d.demo_tickers || []).join(', ');
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const fmtTime = (h) => {
+  const hh = Math.floor(h) % 24;
+  const mm = Math.round((h - Math.floor(h)) * 60);
+  const m2 = mm === 60 ? 0 : mm;
+  const h2 = mm === 60 ? (hh + 1) % 24 : hh;
+  return String(h2).padStart(2, "0") + ":" + String(m2).padStart(2, "0");
+};
+// gaussian kernel for "proximity" enhancement
+const gauss = (dt, sigma) => Math.exp(-(dt * dt) / (2 * sigma * sigma));
+
+// ---------- model ----------
+// Returns time series over a 24h day.
+function simulate(p) {
+  // --- physiology from weight & height ---
+  const bmi = p.weight / Math.pow(p.height / 100, 2);
+  // unisex skeletal-muscle estimate, height-corrected
+  const muscleFrac = clamp(0.45 - (bmi - 22) * 0.006, 0.30, 0.50);
+  const muscleMass = p.weight * muscleFrac * (p.height / 172);      // kg
+  const capacity = muscleMass * 4.6;                                // g of creatine at saturation
+  const baseLoad = 0.70;                                            // start at ~70% saturated
+  let store = capacity * baseLoad;                                  // g currently in muscle
+
+  // --- pharmacokinetics ---
+  const F = 0.95;                  // oral bioavailability
+  const ka = 1.6;                  // /h  absorption rate -> plasma peak ~1h
+  const ke = 0.85;                 // /h  renal elimination from plasma
+  const Vd = 0.5 * p.weight / 70;  // distribution scaling (relative)
+  const kUptakeBase = 0.10;        // baseline muscle uptake constant
+
+  // enhancement: meal -> insulin window, exercise -> blood flow / sensitivity
+  const mealBoost = 0.9, mealSigma = 1.6;     // hours
+  const exBoost = 0.7, exSigma = 2.2;
+
+  // --- time grid (account for wrap-around so a late dose still absorbs) ---
+  const dt = 0.1;                  // hours
+  const N = Math.round(24 / dt) + 1;
+  const t = new Array(N), absorb = new Array(N), loadPct = new Array(N);
+
+  let plasma = 0;
+  // simulate two passes so a dose late in the day carries minimal residue into "today";
+  // we report the second pass (steady daily pattern of a single dose).
+  for (let pass = 0; pass < 2; pass++) {
+    plasma = (pass === 0) ? 0 : plasma; // keep residue between passes
+    let s = store;
+    for (let i = 0; i < N; i++) {
+      const time = i * dt;
+      // input from gut: first-order absorption of the dose given at intake time
+      const since = time - p.intake;
+      const gutRate = since >= 0 ? p.dose * F * ka * Math.exp(-ka * since) : 0; // g/h into plasma
+      // plasma kinetics: dC/dt = input - elimination - muscle uptake
+      const enh = 1 + mealBoost * gauss(time - p.meal, mealSigma)
+                    + exBoost * gauss(time - p.exercise, exSigma);
+      const saturation = clamp(1 - s / capacity, 0, 1);
+      const kU = kUptakeBase * enh * saturation;
+      const uptake = kU * plasma;                       // g/h into muscle
+      plasma += (gutRate / Vd - ke * plasma - uptake) * dt;
+      plasma = Math.max(0, plasma);
+      s += uptake * dt;
+      s = clamp(s, 0, capacity);
+
+      if (pass === 1) {
+        t[i] = time;
+        absorb[i] = gutRate;                            // g/h appearing in circulation
+        loadPct[i] = (s / capacity) * 100;
       }
-    } catch(e) {}
-  })();
+    }
+    store = s; // carry final store as the day's end state
+  }
 
-  document.getElementById('ticker-input').addEventListener('keydown', e => {
-    if (e.key === 'Enter') analyze();
+  // net daily uptake (load gained today)
+  const netUptake = (loadPct[N - 1] - baseLoad * 100) / 100 * capacity;
+
+  return { t, absorb, loadPct, capacity, muscleMass, netUptake, N };
+}
+
+// ---------- chart rendering (SVG) ----------
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(name, attrs) {
+  const e = document.createElementNS(SVGNS, name);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function drawChart(svg, series, opts) {
+  // clear
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+  const W = 640, H = 260;
+  const m = { l: 46, r: 14, t: 14, b: 30 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+
+  const xs = series.t;
+  const ys = series.y;
+  const errFrac = series.err;      // array or constant fraction
+  const xMax = 24;
+  let yMax = opts.yMax || Math.max(...ys.map((v, i) =>
+      v * (1 + (Array.isArray(errFrac) ? errFrac[i] : errFrac)))) * 1.08;
+  if (!isFinite(yMax) || yMax <= 0) yMax = 1;
+  const yMin = opts.yMin != null ? opts.yMin : 0;
+
+  const X = (h) => m.l + (h / xMax) * iw;
+  const Y = (v) => m.t + ih - ((v - yMin) / (yMax - yMin)) * ih;
+
+  // --- gridlines + y labels ---
+  const yTicks = opts.yTicks || 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const v = yMin + (yMax - yMin) * i / yTicks;
+    const y = Y(v);
+    svg.appendChild(el("line", { x1: m.l, y1: y, x2: W - m.r, y2: y,
+      stroke: "var(--grid)", "stroke-width": 1 }));
+    const lbl = el("text", { x: m.l - 8, y: y + 4, "text-anchor": "end",
+      "font-size": 11, fill: "var(--muted-2)", "font-family": "var(--sans)" });
+    lbl.textContent = opts.yFmt ? opts.yFmt(v) : v.toFixed(0);
+    svg.appendChild(lbl);
+  }
+  // --- x labels (every 4h) ---
+  for (let h = 0; h <= 24; h += 4) {
+    const x = X(h);
+    const lbl = el("text", { x, y: H - 10, "text-anchor": "middle",
+      "font-size": 11, fill: "var(--muted-2)", "font-family": "var(--sans)" });
+    lbl.textContent = String(h).padStart(2, "0");
+    svg.appendChild(lbl);
+  }
+
+  // --- event markers ---
+  (opts.markers || []).forEach((mk) => {
+    const x = X(clamp(mk.h, 0, 24));
+    svg.appendChild(el("line", { x1: x, y1: m.t, x2: x, y2: m.t + ih,
+      stroke: mk.color, "stroke-width": 1.5, "stroke-dasharray": "4 4", opacity: .55 }));
+    const tag = el("text", { x: clamp(x, m.l + 14, W - m.r - 14), y: m.t + 11,
+      "text-anchor": "middle", "font-size": 10, "font-weight": 600,
+      fill: mk.color, "font-family": "var(--sans)" });
+    tag.textContent = mk.label;
+    svg.appendChild(tag);
   });
 
-  function quickSearch(ticker) {
-    document.getElementById('ticker-input').value = ticker;
-    analyze();
+  // --- error band path ---
+  let up = "", dn = "";
+  for (let i = 0; i < xs.length; i++) {
+    const e = Array.isArray(errFrac) ? errFrac[i] : errFrac;
+    const hi = Y(ys[i] * (1 + e));
+    up += (i === 0 ? "M" : "L") + X(xs[i]).toFixed(1) + " " + hi.toFixed(1) + " ";
   }
-
-  function setFilter(f, btn) {
-    currentFilter = f;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderTable(allOptions);
+  for (let i = xs.length - 1; i >= 0; i--) {
+    const e = Array.isArray(errFrac) ? errFrac[i] : errFrac;
+    const lo = Y(Math.max(yMin, ys[i] * (1 - e)));
+    dn += "L" + X(xs[i]).toFixed(1) + " " + lo.toFixed(1) + " ";
   }
+  svg.appendChild(el("path", { d: up + dn + "Z",
+    fill: "var(--clay-tint)", stroke: "rgba(201,100,66,0.22)", "stroke-width": 1 }));
 
-  const fmt = (n, d = 2) => n == null ? '—' : Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const fmtPct = n => n == null ? '—' : fmt(n, 1) + '%';
-  const fmtMoney = n => {
-    if (n == null) return '—';
-    if (Math.abs(n) >= 1e12) return '$' + fmt(n / 1e12, 2) + 'T';
-    if (Math.abs(n) >= 1e9)  return '$' + fmt(n / 1e9, 2) + 'B';
-    if (Math.abs(n) >= 1e6)  return '$' + fmt(n / 1e6, 2) + 'M';
-    return '$' + fmt(n, 2);
+  // --- main line (smooth via Catmull-Rom-ish polyline at 0.1h res is already smooth) ---
+  let d = "";
+  for (let i = 0; i < xs.length; i++) {
+    d += (i === 0 ? "M" : "L") + X(xs[i]).toFixed(1) + " " + Y(ys[i]).toFixed(1) + " ";
+  }
+  svg.appendChild(el("path", { d, fill: "none", stroke: "var(--clay)",
+    "stroke-width": 2.5, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+}
+
+// ---------- wiring ----------
+function readParams() {
+  return {
+    weight: parseFloat($("weight").value) || 70,
+    height: parseFloat($("height").value) || 173,
+    intake: parseFloat($("intake").value),
+    dose: parseFloat($("dose").value),
+    meal: parseFloat($("meal").value),
+    exercise: parseFloat($("exercise").value),
   };
+}
 
-  function getRatioMeta(ratio) {
-    if (ratio == null) return { badge: '<span class="badge bg-gray">N/A</span>', color: '#374151' };
-    if (ratio >= 1.0) return { badge: '<span class="badge bg-green">≥ 100%</span>', color: '#22c55e' };
-    if (ratio >= 0.7) return { badge: '<span class="badge bg-yellow">70~99%</span>', color: '#f59e0b' };
-    if (ratio >= 0.4) return { badge: '<span class="badge bg-orange">40~69%</span>', color: '#f97316' };
-    return { badge: '<span class="badge bg-red">&lt; 40%</span>', color: '#ef4444' };
-  }
+function update() {
+  const p = readParams();
 
-  function renderTable(options) {
-    const list = currentFilter === 'all'
-      ? options
-      : options.filter(o => o.strike_label.startsWith(currentFilter === 'OTM 5%' ? 'OTM 5%' : currentFilter === 'OTM 10%' ? 'OTM 10%' : 'ATM'));
+  // slider value labels
+  $("v-intake").textContent = fmtTime(p.intake);
+  $("v-dose").textContent = p.dose.toFixed(1) + " g";
+  $("v-meal").textContent = fmtTime(p.meal);
+  $("v-exercise").textContent = fmtTime(p.exercise);
 
-    const tbody = document.getElementById('options-tbody');
-    if (!list.length) {
-      tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:32px;color:var(--muted)">해당 조건의 옵션이 없습니다</td></tr>';
-      return;
-    }
+  const r = simulate(p);
 
-    const bestAnn = Math.max(...list.map(o => o.annualized_spread_ratio ?? 0));
+  // stats
+  $("s-muscle").innerHTML = r.muscleMass.toFixed(1) + "<small> kg</small>";
+  $("s-capacity").innerHTML = r.capacity.toFixed(0) + "<small> g</small>";
+  $("s-uptake").innerHTML = r.netUptake.toFixed(2) + "<small> g</small>";
 
-    tbody.innerHTML = list.map(opt => {
-      const ratio = opt.spread_ratio;
-      const ann = opt.annualized_spread_ratio;
-      const { badge, color } = getRatioMeta(ratio);
-      const annMeta = getRatioMeta(ann);
-      const barW = Math.min(100, (ratio ?? 0) * 100);
-      const isBest = ann != null && Math.abs(ann - bestAnn) < 0.0001 && bestAnn > 0;
+  const markers = [
+    { h: p.intake, color: "#C96442", label: "섭취" },
+    { h: p.meal, color: "#6A8D5B", label: "식사" },
+    { h: p.exercise, color: "#8466C9", label: "운동" },
+  ];
 
-      const netCell = opt.net_put_cost_per_share <= 0
-        ? `<span class="c-green" style="font-weight:700">완전 충당</span>`
-        : `$${fmt(opt.net_put_cost_per_share, 4)}<br/><span class="c-muted" style="font-size:10px">(-${fmtPct(opt.net_put_cost_pct)})</span>`;
+  // chart 1: absorption (g/h), constant ±15% error
+  drawChart($("chart-abs"),
+    { t: r.t, y: r.absorb, err: 0.15 },
+    { markers, yTicks: 4, yFmt: (v) => v.toFixed(1) });
 
-      const ratioCell = `
-        <div class="ratio-cell">
-          ${badge}
-          <div class="ratio-bar-bg"><div class="ratio-bar-fill" style="width:${barW}%;background:${color}"></div></div>
-          <span style="color:${color};font-weight:700">${ratio != null ? fmtPct(ratio*100) : '—'}</span>
-        </div>`;
+  // chart 2: load % — error grows with cumulative uptake over the day
+  const loadErr = r.loadPct.map((_, i) => 0.02 + 0.06 * (i / (r.N - 1)));
+  // tight y-window around the load trajectory for readability
+  const lmin = Math.min(...r.loadPct), lmax = Math.max(...r.loadPct);
+  drawChart($("chart-load"),
+    { t: r.t, y: r.loadPct, err: loadErr },
+    { markers, yTicks: 4,
+      yMin: Math.max(0, lmin - 4), yMax: Math.min(100, lmax + 4) + 0.001,
+      yFmt: (v) => v.toFixed(0) + "%" });
+}
 
-      return `<tr class="${isBest ? 'best-row' : ''}">
-        <td class="left"><strong>${opt.expiration}</strong></td>
-        <td class="left"><span style="color:var(--accent);font-weight:700">${opt.strike_label}</span></td>
-        <td>$${fmt(opt.strike, 2)} <span class="c-muted" style="font-size:10px">(${fmtPct(opt.strike_pct)})</span></td>
-        <td>${opt.days_to_exp}일</td>
-        <td>
-          $${fmt(opt.premium_per_share, 4)}<br/>
-          <span class="c-muted" style="font-size:10px">${fmt(opt.bid,3)} / ${fmt(opt.ask,3)}</span>
-        </td>
-        <td>$${fmt(opt.annualized_premium_per_share, 4)}</td>
-        <td class="c-green">$${fmt(opt.period_div_per_share, 4)}</td>
-        <td class="c-green">$${fmt(opt.period_div_total, 2)}</td>
-        <td class="c-red">$${fmt(opt.put_cost_total, 2)}</td>
-        <td>${netCell}</td>
-        <td>${ratioCell}</td>
-        <td style="color:${annMeta.color};font-weight:800;font-size:13px">${ann != null ? fmtPct(ann*100) : '—'}</td>
-        <td class="c-muted">${opt.volume.toLocaleString()}</td>
-      </tr>`;
-    }).join('');
-  }
+// smooth, throttled updates on slider drag
+let raf = null;
+function scheduleUpdate() {
+  if (raf) return;
+  raf = requestAnimationFrame(() => { raf = null; update(); });
+}
 
-  async function analyze() {
-    const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
-    const shares = parseInt(document.getElementById('shares-input').value) || 100;
+["weight", "height", "intake", "dose", "meal", "exercise"].forEach((id) => {
+  $(id).addEventListener("input", scheduleUpdate);
+});
 
-    if (!ticker) { alert('티커를 입력하세요'); return; }
-
-    document.getElementById('error-box').style.display = 'none';
-    document.getElementById('stock-summary').style.display = 'none';
-    document.getElementById('table-section').style.display = 'none';
-    document.getElementById('strategy-box').style.display = 'none';
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('analyze-btn').disabled = true;
-
-    try {
-      const res = await fetch(`/api/analyze?ticker=${encodeURIComponent(ticker)}&shares=${shares}`);
-      const data = await res.json();
-
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('analyze-btn').disabled = false;
-
-      if (!res.ok || data.error) {
-        const eb = document.getElementById('error-box');
-        eb.style.display = 'block';
-        eb.textContent = data.error || '알 수 없는 오류가 발생했습니다.';
-        if (data.stock) renderSummary(data.stock, shares, null, data.demo_mode);
-        return;
-      }
-
-      renderSummary(data.stock, shares, data, data.demo_mode);
-
-      allOptions = data.options;
-      currentFilter = 'all';
-      document.querySelectorAll('.filter-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
-
-      document.getElementById('table-title').textContent =
-        `${ticker} 풋옵션별 배당 커버리지 분석 (${shares.toLocaleString()}주 기준)`;
-      document.getElementById('table-section').style.display = 'block';
-      document.getElementById('strategy-box').style.display = 'block';
-      renderTable(allOptions);
-
-    } catch(e) {
-      document.getElementById('loading').style.display = 'none';
-      document.getElementById('analyze-btn').disabled = false;
-      const eb = document.getElementById('error-box');
-      eb.style.display = 'block';
-      eb.textContent = '서버 연결 오류: ' + e.message;
-    }
-  }
-
-  function renderSummary(stock, shares, data, isDemo) {
-    document.getElementById('s-ticker').textContent = stock.ticker;
-    document.getElementById('s-name').textContent = stock.name;
-
-    const metaEl = document.getElementById('s-meta');
-    metaEl.innerHTML = `
-      <span class="tag tag-blue">${stock.exchange}</span>
-      ${stock.sector && stock.sector !== 'N/A' ? `<span class="tag tag-gray">${stock.sector}</span>` : ''}
-      ${isDemo ? '<span class="tag" style="background:rgba(245,158,11,0.12);color:var(--yellow);border:1px solid rgba(245,158,11,0.25)">Demo Data</span>' : ''}
-    `;
-
-    const posVal = stock.price * shares;
-    const annDiv = stock.annual_div_per_share * shares;
-
-    let bestHtml = '—';
-    let bestSub = '&nbsp;';
-    if (data && data.best_option) {
-      const b = data.best_option;
-      const v = b.annualized_spread_ratio;
-      const c = v >= 1 ? 'c-green' : v >= 0.5 ? 'c-yellow' : 'c-red';
-      bestHtml = `<span class="${c}">${fmt(v * 100, 1)}%</span>`;
-      bestSub = `만기 ${b.expiration} · ${b.strike_label}`;
-    }
-
-    document.getElementById('kpi-grid').innerHTML = `
-      <div class="kpi">
-        <div class="kpi-label">현재 주가</div>
-        <div class="kpi-value c-blue">$${fmt(stock.price, 2)}</div>
-        <div class="kpi-sub">${stock.exchange}</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">연간 주당 배당금</div>
-        <div class="kpi-value c-green">$${fmt(stock.annual_div_per_share, 4)}</div>
-        <div class="kpi-sub">배당수익률 ${fmtPct(stock.div_yield_pct)}</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">포지션 가치</div>
-        <div class="kpi-value c-blue">$${fmt(posVal, 0)}</div>
-        <div class="kpi-sub">${shares.toLocaleString()}주 × $${fmt(stock.price, 2)}</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">연간 배당 합계</div>
-        <div class="kpi-value c-green">$${fmt(annDiv, 2)}</div>
-        <div class="kpi-sub">${shares.toLocaleString()}주 포지션 기준</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">최고 연환산 Spread Ratio</div>
-        <div class="kpi-value">${bestHtml}</div>
-        <div class="kpi-sub">${bestSub}</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">시가총액</div>
-        <div class="kpi-value" style="font-size:15px">${stock.market_cap ? fmtMoney(stock.market_cap) : '—'}</div>
-        <div class="kpi-sub">&nbsp;</div>
-      </div>
-    `;
-    document.getElementById('stock-summary').style.display = 'block';
-  }
+update();
 </script>
 </body>
 </html>
